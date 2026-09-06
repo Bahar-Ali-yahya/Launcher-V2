@@ -1,4 +1,17 @@
 name: Build APK & ZIP
+- name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate Gradle Wrapper
+        run: |
+          cd "$PROJ"
+          gradle wrapper --gradle-version 8.7
+
+      - name: Build APK
+        run: |
+          cd "$PROJ"
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
 
 on:
   push:
