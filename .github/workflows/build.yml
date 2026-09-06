@@ -47,29 +47,21 @@ jobs:
         run: |
           cd "$PROJ"
           mkdir -p output
-          cp app/build/outputs/apk/release/*.apk output/ || echo "No APK found"
-          
-          cat > output/README.txt << 'EOF'
-Redmi A5 HyperLauncher V2
-Installation: Install the APK on your device
-Support: https://github.com/Bahar-Ali-yahya/Launcher-V2
-EOF
-          
-          cd output
-          zip -r ../HyperLauncher_Release.zip *
-          cd ..
+          cp app/build/outputs/apk/release/*.apk output/ 2>/dev/null || echo "No APK found"
+          echo "Redmi A5 HyperLauncher V2" > output/README.txt
+          cd output && zip -r ../HyperLauncher_Release.zip * && cd ..
           ls -lh HyperLauncher_Release.zip
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: APK-Release
-          path: "${{ env.PROJ }}/app/build/outputs/apk/release/*.apk"
+          path: ${{ env.PROJ }}/app/build/outputs/apk/release/*.apk
           retention-days: 30
       
       - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
           name: Package-ZIP
-          path: "${{ env.PROJ }}/HyperLauncher_Release.zip"
+          path: ${{ env.PROJ }}/HyperLauncher_Release.zip
           retention-days: 30
