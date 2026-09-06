@@ -46,13 +46,13 @@ jobs:
         run: |
           cd "$PROJ"
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleDebug --no-daemon
 
       - name: Create ZIP package
         run: |
           cd "$PROJ"
           mkdir -p output
-          cp app/build/outputs/apk/release/*.apk output/ 2>/dev/null || echo "No APK found"
+          cp app/build/outputs/apk/debug/*.apk output/ 2>/dev/null || echo "No APK found"
           echo "Redmi A5 HyperLauncher V2" > output/README.txt
           cd output && zip -r ../HyperLauncher_Release.zip * && cd ..
           ls -lh HyperLauncher_Release.zip
@@ -60,8 +60,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: APK-Release
-          path: ${{ env.PROJ }}/app/build/outputs/apk/release/*.apk
+          name: APK-Debug
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
       - name: Upload ZIP
