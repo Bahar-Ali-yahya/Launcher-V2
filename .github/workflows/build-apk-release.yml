@@ -1,0 +1,193 @@
+name: Build APK & ZIP Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build APK & ZIP Package
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract project from ZIP
+        run: |
+          if [ -f "RedmiA5_HyperLauncher_V2_GitHub_Ready.zip" ]; then
+            unzip -q "RedmiA5_HyperLauncher_V2_GitHub_Ready.zip"
+            cd RedmiA5_HyperLauncher_v2
+            ls -la
+          else
+            echo "ZIP file not found"
+            exit 1
+          fi
+
+      - name: Make gradlew executable
+        run: |
+          cd RedmiA5_HyperLauncher_v2
+          chmod +x gradlew
+
+      - name: Build Release APK
+        run: |
+          cd RedmiA5_HyperLauncher_v2
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Create ZIP package for Android
+        run: |
+          cd RedmiA5_HyperLauncher_v2
+          mkdir -p android-package
+          
+          cp app/build/outputs/apk/release/*.apk android-package/ 2>/dev/null || true
+          
+          cat > android-package/INSTALL.txt << 'EOF'
+          ╔════════════════════════════════════════════════╗
+          ║  Redmi A5 HyperLauncher Installation Guide    ║
+          ╚════════════════════════════════════════════════╝
+          
+          1. METHODE D'INSTALLATION
+             Option A: Installation directe du APK
+             - Copiez le fichier .apk sur votre Redmi A5
+             - Ouvrez le gestionnaire de fichiers et tapez sur le APK
+             - Suivez les instructions d'installation
+          
+             Option B: Via ADB
+             - Activez le débogage USB sur votre appareil
+             - Connectez-vous au PC via USB
+             - Exécutez: adb install -r app-release.apk
+          
+          2. AUTORISATIONS
+             L'application nécessite ces autorisations:
+             - Accès au lanceur de l'appareil
+             - Superposition système (pour les fenêtres flottantes)
+             - Accès au stockage
+          
+          3. PREMIER LANCEMENT
+             - Ouvrez l'application à partir de votre tiroir d'applications
+             - Accordez les autorisations demandées
+             - Personnalisez les tuiles et la disposition
+          
+          4. DEPANNAGE
+             - Si l'installation échoue: activez "Sources inconnues"
+             - Force à effacer les données de l'application
+             - Vérifiez l'espace de stockage disponible (~50 Mo gratuit)
+          
+          5. SUPPORT
+             Visitez: https://github.com/Bahar-Ali-yahya/Launcher-V2
+          EOF
+          
+          cat > android-package/README.txt << 'EOF'
+          Redmi A5 HyperLauncher V2
+          ==========================
+          
+          Contenu:
+          - app-release.apk      : APK du lanceur principal
+          - INSTALL.txt          : Instructions d'installation
+          - README.txt           : Ce fichier
+          
+          Exigences:
+          - Android 10+ (API 29+)
+          - ~50 Mo d'espace libre
+          - Compatible avec Redmi A5 et appareils similaires
+          
+          Version: 2.0
+          EOF
+          
+          cd android-package
+          zip -r ../HyperLauncher_Android_Package.zip *
+          cd ..
+          
+          ls -lh HyperLauncher_Android_Package.zip
+
+      - name: List build outputs
+        if: always()
+        run: |
+          cd RedmiA5_HyperLauncher_v2
+          echo "=== Résultats de la compilation ==="
+          ls -lh app/build/outputs/apk/release/ || echo "Aucun APK trouvé"
+          echo ""
+          echo "=== Paquet ZIP ==="
+          ls -lh *.zip || echo "Aucun ZIP trouvé"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: APK-Release
+          path: RedmiA5_HyperLauncher_v2/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-Package-ZIP
+          path: RedmiA5_HyperLauncher_v2/HyperLauncher_Android_Package.zip
+          retention-days: 30
+
+      - name: Créer une version GitHub (lors de push de tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            RedmiA5_HyperLauncher_v2/app/build/outputs/apk/release/*.apk
+            RedmiA5_HyperLauncher_v2/HyperLauncher_Android_Package.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commenter la demande de tirage avec le statut
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const apkPath = 'RedmiA5_HyperLauncher_v2/app/build/outputs/apk/release/app-release.apk';
+            const zipPath = 'RedmiA5_HyperLauncher_v2/HyperLauncher_Android_Package.zip';
+            
+            let comment = '## ✅ Statut de la Compilation\n\n';
+            
+            if (fs.existsSync(apkPath)) {
+              const apkSize = fs.statSync(apkPath).size / (1024 * 1024);
+              comment += `✅ APK compilé avec succès (${apkSize.toFixed(2)} MB)\n`;
+            } else {
+              comment += '❌ La compilation du APK a échoué\n';
+            }
+            
+            if (fs.existsSync(zipPath)) {
+              const zipSize = fs.statSync(zipPath).size / (1024 * 1024);
+              comment += `✅ Paquet ZIP créé (${zipSize.toFixed(2)} MB)\n`;
+            } else {
+              comment += '❌ La création du paquet ZIP a échoué\n';
+            }
+            
+            comment += '\n**Les artefacts sont disponibles dans les détails de la compilation** 📦';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
