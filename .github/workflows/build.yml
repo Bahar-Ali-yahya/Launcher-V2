@@ -1,0 +1,75 @@
+name: Build APK & ZIP
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Extract ZIP
+        run: |
+          ZIP=$(ls *.zip | head -1)
+          echo "Extracting $ZIP"
+          unzip -q "$ZIP"
+          ls -la
+      
+      - name: Find project
+        run: |
+          PROJ=$(find . -maxdepth 1 -type d \( -iname "*redmi*" -o -iname "*launcher*" \) | head -1)
+          echo "Project: $PROJ"
+          echo "PROJ=$PROJ" >> $GITHUB_ENV
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: gradle
+      
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      
+      - name: Build APK
+        run: |
+          cd "$PROJ"
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+      
+      - name: Create ZIP package
+        run: |
+          cd "$PROJ"
+          mkdir -p output
+          cp app/build/outputs/apk/release/*.apk output/ || echo "No APK found"
+          
+          cat > output/README.txt << 'EOF'
+Redmi A5 HyperLauncher V2
+Installation: Install the APK on your device
+Support: https://github.com/Bahar-Ali-yahya/Launcher-V2
+EOF
+          
+          cd output
+          zip -r ../HyperLauncher_Release.zip *
+          cd ..
+          ls -lh HyperLauncher_Release.zip
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: APK-Release
+          path: "${{ env.PROJ }}/app/build/outputs/apk/release/*.apk"
+          retention-days: 30
+      
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Package-ZIP
+          path: "${{ env.PROJ }}/HyperLauncher_Release.zip"
+          retention-days: 30
